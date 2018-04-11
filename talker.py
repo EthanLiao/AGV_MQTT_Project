@@ -46,8 +46,7 @@ def talker():
     rospy.init_node('talker', anonymous=True)
     rate = rospy.Rate(10) # 10hz
     while not rospy.is_shutdown():
-        # hello_str = "hello world %s" % rospy.get_time()
-        hello_str=getch.getch()
+        hello_str = getch.getch()
 	if hello_str == "0":
 	    sys.exit()
 	hello_str=ord(hello_str)
