@@ -1,0 +1,195 @@
+#define DHTPIN 4     // what digital pin we’re connected to
+#define DHTTYPE DHT11   // DHT 11
+#include "DHT.h"
+#include <ESP8266WiFi.h>
+#include <PubSubClient.h>
+
+// Update these with values suitable for your network.
+
+char* ssid = "murray_server";
+char* password = "77777777";
+char* mqtt_server = "192.168.0.111";
+
+char prev_setFlag='0',after_setFlag='0';
+
+
+DHT dht(DHTPIN, DHTTYPE);
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+unsigned long lastSend;
+
+void(* resetFunc) (void) = 0; //declare reset function @ address 0
+
+
+void setup_wifi() {
+
+  delay(10);
+  // We start by connecting to a WiFi network
+  Serial.println();
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  randomSeed(micros());
+
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+  digitalWrite(2,HIGH);
+}
+
+void reconnect() {
+  // Loop until we're reconnected
+  while (!client.connected()) {
+    Serial.print("Attempting MQTT connection...");
+    // Create a random client ID
+    String clientId = "ESP8266Client-";
+    clientId += String(random(0xffff), HEX);
+    // Attempt to connect
+   
+  }
+}
+
+void setup() {
+  pinMode(4, OUTPUT);     // Initialize the BUILTIN_LED pin as an output
+  pinMode(2, OUTPUT);     // wifi connection test: red
+    
+
+  digitalWrite(2, LOW);
+  Serial.begin(115200);
+  Serial.println("DHT11 test!");
+  dht.begin();
+  setup_wifi();
+  client.setServer(mqtt_server, 1883);
+  client.setCallback(callback);
+   while (!client.connected()) {
+    Serial.println("Connecting to MQTT...");
+ 
+    if (client.connect("ESP8266Client")) {
+ 
+      Serial.println("connected");  
+ 
+    } else {
+ 
+      Serial.print("failed with state ");
+      Serial.print(client.state());
+      delay(2000);
+ 
+    }
+  }
+  lastSend = 0;
+  client.subscribe("test");
+}
+
+void callback(char* topic, byte* payload, unsigned int length) {
+ 
+  Serial.print("Message arrived in topic: ");
+  Serial.println(topic);
+  after_setFlag=(char)payload[0];
+
+  Serial.println(after_setFlag);
+  
+  if(prev_setFlag!=after_setFlag)
+    {
+      if(after_setFlag=='0')
+       {
+        ssid="staic";
+        mqtt_server = "192.168.0.1";
+       }
+      else if(after_setFlag=='1')
+       {
+        ssid="AGV";
+        mqtt_server = "192.168.0.1";
+       }
+
+       else if(after_setFlag=='3')
+        {
+        ssid="murray_server";
+        mqtt_server = "192.168.0.111";
+        }
+
+        else if(after_setFlag=='4')
+        {
+        ssid="D-link";
+        mqtt_server = "140.113.66.39";
+        } 
+       after_setFlag=prev_setFlag;
+       setup() ;        
+    }
+  
+  
+   /**Serial.print("Message:");
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+  }
+  Serial.println();
+  Serial.println("-----------------------");
+  **/
+}
+
+void loop() {
+  delay(1000);
+
+  float h = dht.readHumidity();
+  float t = dht.readTemperature();
+
+
+
+  // Check if any reads failed and exit early (to try again).
+  if (isnan(h) || isnan(t) ) {
+  Serial.println("Failed to read from DHT sensor!");
+  return;
+  
+  }
+  
+  Serial.print("Humidity: ");
+  Serial.print(h);
+  Serial.print(" %\t");
+  Serial.print("Temperature: ");
+  Serial.print(t);
+  Serial.println(" *C ");
+
+  String temperature = String(t);
+  String humidity = String(h);
+
+  if (!client.connected()) {
+    digitalWrite(2,LOW);
+    reconnect();
+  }
+  if ( millis() - lastSend > 1000 ) { // Update and send only after 1 seconds
+    String payload1 = "{";
+    payload1 += "\"temperature\":";
+    payload1 += temperature;
+    payload1 += "}";
+
+    String payload2 = "{";
+    payload2 += "\"humidity\":";
+    payload2 += humidity;
+    payload2 += "}";
+    
+    char attributes1[100];
+    char attributes2[100];
+    payload1.toCharArray( attributes1, 100 );
+    payload2.toCharArray( attributes2, 100 );
+    
+    Serial.print("Publish message: ");
+    Serial.println(attributes1);
+    Serial.println(attributes2);
+    
+    client.publish("dht11/temperature", attributes1);
+    client.publish("dht11/humidity", attributes2);
+    lastSend = millis();
+  }
+  client.loop();
+
+ 
+}
