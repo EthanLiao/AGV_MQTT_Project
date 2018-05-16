@@ -1,0 +1,2 @@
+mqtt-lat --broker tcp://test.mosquitto.org:1883 --count 10 --size 100 --clients 1 --subqos 1 --pubqos 2 --format text
+mqtt-lat --broker tcp://iot.eclipse.org:1883 --count 10 --size 100 --clients 1 --subqos 1 --pubqos 2 --format text
